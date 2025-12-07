@@ -1,0 +1,763 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Sound Shorts Studio — 12-pad + Sequencer</title>
+<style>
+  :root{
+    --bg:#071022; --card:#0b1220; --muted:#98a0b3; --accent:#7c5cff;
+    font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%; margin:0; background:linear-gradient(180deg,#071025 0%,var(--bg) 100%); color:#e6eef8}
+  .container{max-width:1100px; margin:18px auto; padding:18px;}
+  header{display:flex;gap:12px;align-items:center;justify-content:space-between;margin-bottom:14px}
+  h1{font-size:20px;margin:0;color:var(--accent)}
+  p.lead{margin:0;color:var(--muted);font-size:13px}
+  .board{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  .pad{
+    background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
+    border:1px solid rgba(255,255,255,0.04);
+    border-radius:12px;padding:10px;min-height:120px;display:flex;flex-direction:column;gap:8px;
+    transition:transform .06s ease, box-shadow .06s ease; user-select:none;
+  }
+  .pad.playing{transform:translateY(-4px); box-shadow: 0 10px 30px rgba(0,0,0,0.5)}
+  .pad .title{font-weight:700;font-size:14px;color:#f3f7ff;display:flex;justify-content:space-between;align-items:center}
+  .pad .hint{font-size:12px;color:var(--muted)}
+  .pad .controls{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .btn{
+    background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.03); padding:8px;border-radius:8px;color:var(--muted);cursor:pointer;
+  }
+  .btn.primary{background:linear-gradient(90deg,var(--accent),#5ad0ff); color:#071025; font-weight:700}
+  .small{font-size:12px;padding:6px;border-radius:6px}
+  input[type=range]{width:100%}
+  .topbar{display:flex;gap:8px;align-items:center}
+  .master-controls{display:flex;gap:10px;align-items:center}
+  footer{margin-top:14px;color:var(--muted);font-size:13px}
+  .panel{background:rgba(255,255,255,0.02); border-radius:10px; padding:10px; border:1px solid rgba(255,255,255,0.03)}
+  .flex{display:flex;gap:8px;align-items:center}
+  .kbd{background:#071025;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.04);font-weight:700}
+  canvas{width:100%; height:60px; display:block; border-radius:6px}
+  .row{display:flex;gap:8px;align-items:center}
+  .sequencer { display:flex; flex-direction:column; gap:8px; margin-top:8px }
+  .seq-row { display:flex; gap:4px; }
+  .step { width:18px; height:18px; border-radius:4px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.02); cursor:pointer; }
+  .step.active { background:var(--accent); box-shadow:0 4px 10px rgba(124,92,255,0.12); }
+  .controls-row { display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap; }
+  .board-wrap { display:flex; gap:12px; align-items:flex-start; }
+  @media (max-width:900px){
+    .board{grid-template-columns:repeat(2,1fr)}
+    header{flex-direction:column;align-items:flex-start;gap:8px}
+    .board-wrap{flex-direction:column}
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div>
+      <h1>Sound Shorts Studio — 12 Pads + Sequencer</h1>
+      <p class="lead">Upload or use built-in samples, edit labels, auto-chop, play pads (1–12), or sequence 16-step patterns. Ready for Vercel.</p>
+    </div>
+    <div class="topbar">
+      <div class="panel master-controls">
+        <label style="font-size:13px;margin-right:8px">Master</label>
+        <input id="masterGain" type="range" min="0" max="1.5" step="0.01" value="1" title="Master volume" />
+        <button id="recordBtn" class="btn small">Record</button>
+      </div>
+    </div>
+  </header>
+
+  <section class="board-wrap">
+    <div style="flex:1" class="panel">
+      <div class="controls-row">
+        <div class="flex">
+          <input id="fileInput" type="file" accept="audio/*" style="display:none" multiple />
+          <button id="addPadBtn" class="btn small">Upload</button>
+          <label style="margin-left:8px;"><input id="autoChop" type="checkbox" /> Auto-chop (split into pads)</label>
+          <button id="addLibraryBtn" class="btn small">Add Built-in Library</button>
+          <button id="clearPadsBtn" class="btn small">Clear Pads</button>
+        </div>
+        <div style="margin-left:auto" class="flex">
+          <label>BPM</label>
+          <input id="bpm" type="number" min="40" max="240" value="120" style="width:70px" />
+          <button id="playSeqBtn" class="btn small">Play Seq</button>
+          <button id="stopSeqBtn" class="btn small">Stop</button>
+        </div>
+      </div>
+
+      <div style="margin-top:8px">
+        <strong>Pads (keyboard: 1 2 3 4 5 6 7 8 9 0 - = )</strong>
+      </div>
+      <div class="board" id="board"></div>
+
+      <div style="margin-top:12px" class="sequencer panel">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <strong>16-step Sequencer</strong>
+          <div class="hint" style="font-size:13px;color:var(--muted)">Toggle steps per pad row, press Play</div>
+        </div>
+        <div id="seqRows" style="max-height:320px;overflow:auto;padding-top:8px"></div>
+      </div>
+    </div>
+
+    <aside style="width:320px" class="panel">
+      <div style="margin-bottom:8px"><strong>Global Effects</strong></div>
+      <div style="margin-bottom:8px">
+        <label>Reverb (IR length)</label>
+        <input id="reverbSize" type="range" min="0" max="3" step="0.1" value="0.8"/>
+        <div class="row" style="justify-content:space-between">
+          <label class="hint">Delay (ms)</label>
+          <input id="delayMs" type="range" min="0" max="800" step="1" value="0"/>
+        </div>
+        <div class="row" style="justify-content:space-between;margin-top:6px">
+          <label class="hint">Wet</label>
+          <input id="fxWet" type="range" min="0" max="1" step="0.01" value="0.18"/>
+        </div>
+      </div>
+
+      <div style="margin-top:10px">
+        <strong>Output Visual</strong>
+        <canvas id="vis" width="600" height="120"></canvas>
+      </div>
+
+      <div style="margin-top:10px;font-size:13px;color:var(--muted)">
+        <p><strong>Notes:</strong> Auto-chop splits the uploaded file into up to 12 equal slices. Built-in library uses procedural sounds so it’s fully royalty-free. Recording exports WAV (ready to upload to Shorts). For MP3 export, I can add server-side encoding instructions for Vercel or bundle a client encoder.</p>
+      </div>
+    </aside>
+  </section>
+
+  <footer style="margin-top:14px;color:var(--muted);font-size:13px">
+    <div class="flex"><span>Drop it on Vercel — file is self-contained HTML + JS.</span></div>
+  </footer>
+</div>
+
+<script>
+/* Single-file Sound Shorts Studio — 12 pads + sequencer
+   - No external libs; all samples generated or uploaded by user
+   - Auto-chop splits uploaded audio buffer into N slices (N <= 12)
+   - Sequencer: 16 steps per pad, BPM controlled
+   - Keys 1..9 0 - = map to pad 1..12
+*/
+
+/* --- Audio context + graph --- */
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+const masterGain = audioCtx.createGain();
+masterGain.gain.value = 1;
+masterGain.connect(audioCtx.destination);
+
+// capture for recording (MediaStreamDestination)
+const destinationStream = audioCtx.createMediaStreamDestination();
+masterGain.connect(destinationStream);
+
+// FX: delay + convolver -> wet gain -> master
+const delayNode = audioCtx.createDelay(2.0);
+delayNode.delayTime.value = 0;
+const convolver = audioCtx.createConvolver();
+const fxWet = audioCtx.createGain(); fxWet.gain.value = 0.18;
+delayNode.connect(convolver);
+convolver.connect(fxWet);
+delayNode.connect(fxWet);
+fxWet.connect(masterGain);
+
+// analyser for visual
+const analyser = audioCtx.createAnalyser(); analyser.fftSize = 1024;
+masterGain.connect(analyser);
+
+/* --- UI elements --- */
+const boardEl = document.getElementById('board');
+const fileInput = document.getElementById('fileInput');
+const addPadBtn = document.getElementById('addPadBtn');
+const addLibraryBtn = document.getElementById('addLibraryBtn');
+const autoChopCheckbox = document.getElementById('autoChop');
+const clearPadsBtn = document.getElementById('clearPadsBtn');
+const masterGainSlider = document.getElementById('masterGain');
+const recordBtn = document.getElementById('recordBtn');
+const reverbSize = document.getElementById('reverbSize');
+const delayMs = document.getElementById('delayMs');
+const fxWetSlider = document.getElementById('fxWet');
+const visCanvas = document.getElementById('vis');
+const bpmInput = document.getElementById('bpm');
+const playSeqBtn = document.getElementById('playSeqBtn');
+const stopSeqBtn = document.getElementById('stopSeqBtn');
+const seqRowsEl = document.getElementById('seqRows');
+
+masterGainSlider.addEventListener('input', e => masterGain.gain.value = parseFloat(e.target.value));
+delayMs.addEventListener('input', e => delayNode.delayTime.value = parseFloat(e.target.value)/1000);
+fxWetSlider.addEventListener('input', e => fxWet.gain.value = parseFloat(e.target.value));
+reverbSize.addEventListener('input', updateReverbIR);
+
+addPadBtn.addEventListener('click', ()=> fileInput.click());
+fileInput.addEventListener('change', handleFiles);
+addLibraryBtn.addEventListener('click', addBuiltInLibrary);
+clearPadsBtn.addEventListener('click', clearPads);
+
+recordBtn.addEventListener('click', toggleRecording);
+
+/* --- Recording (WAV) --- */
+let mediaRecorder = null;
+let recordingChunks = [];
+function toggleRecording(){
+  if (!mediaRecorder || mediaRecorder.state === 'inactive'){
+    startRecording();
+  } else if (mediaRecorder.state === 'recording'){
+    stopRecording();
+  }
+}
+function startRecording(){
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  recordingChunks = [];
+  mediaRecorder = new MediaRecorder(destinationStream.stream);
+  mediaRecorder.ondataavailable = e => recordingChunks.push(e.data);
+  mediaRecorder.onstop = () => {
+    const blob = new Blob(recordingChunks, { type: 'audio/wav' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.download = 'sound-shorts-recording.wav'; a.href = url; a.click();
+    URL.revokeObjectURL(url);
+  };
+  mediaRecorder.start();
+  recordBtn.textContent = 'Stop & Download';
+  recordBtn.classList.add('primary');
+}
+function stopRecording(){
+  if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
+  recordBtn.textContent = 'Record';
+  recordBtn.classList.remove('primary');
+}
+
+/* --- Pads & Sequencer data structures --- */
+const pads = []; // {id, name, buffer, settings:{gain,rate,loop,reverse,key,labelEditable}}
+let padCount = 0;
+const MAX_PADS = 12;
+
+// sequencer: steps[padIndex] = array[16] booleans
+const STEPS = 16;
+let steps = []; // will align with pads
+
+/* --- helpers: keys for 12 pads --- */
+const PAD_KEYS = ['1','2','3','4','5','6','7','8','9','0','-','='];
+
+/* --- Create built-in sample library (procedural) --- */
+function makeNoiseBuffer(durationSec=0.3){
+  const sr = audioCtx.sampleRate;
+  const buf = audioCtx.createBuffer(1, Math.floor(sr*durationSec), sr);
+  const data = buf.getChannelData(0);
+  for (let i=0;i<data.length;i++){
+    const t = i / data.length;
+    data[i] = (Math.random()*2-1) * Math.pow(1 - t, 3);
+  }
+  return buf;
+}
+function makeClickBuffer(){
+  // short click
+  const sr = audioCtx.sampleRate;
+  const buf = audioCtx.createBuffer(1, Math.floor(sr*0.12), sr);
+  const d = buf.getChannelData(0);
+  for (let i=0;i<d.length;i++){
+    const t = i / sr;
+    d[i] = Math.sin(2*Math.PI*8000*t) * Math.exp(-40*t) * (Math.random()*0.5+0.5);
+  }
+  return buf;
+}
+function makeKickBuffer(){
+  const sr = audioCtx.sampleRate;
+  const len = Math.floor(sr*0.5);
+  const buf = audioCtx.createBuffer(1, len, sr);
+  const d = buf.getChannelData(0);
+  for (let i=0;i<len;i++){
+    const t = i / sr;
+    const freq = 150 * Math.pow(0.001 + (1 - t), 3.0) ;
+    d[i] = Math.sin(2*Math.PI*freq*t) * Math.exp(-6*t);
+  }
+  return buf;
+}
+function makeSnareBuffer(){
+  // noise burst + short tone
+  const sr = audioCtx.sampleRate;
+  const len = Math.floor(sr*0.25);
+  const buf = audioCtx.createBuffer(1, len, sr);
+  const d = buf.getChannelData(0);
+  for (let i=0;i<len;i++){
+    const t = i/sr;
+    const noise = (Math.random()*2-1) * Math.exp(-20*t);
+    const tone = Math.sin(2*Math.PI*300*t) * Math.exp(-10*t) * 0.6;
+    d[i] = noise + tone;
+  }
+  return buf;
+}
+function makeHatBuffer(){
+  const sr = audioCtx.sampleRate;
+  const len = Math.floor(sr*0.12);
+  const buf = audioCtx.createBuffer(1, len, sr);
+  const d = buf.getChannelData(0);
+  for (let i=0;i<len;i++){
+    const t = i/sr;
+    d[i] = (Math.random()*2-1) * Math.exp(-30*t);
+  }
+  return buf;
+}
+function makeShortSynth(freq=800, dur=0.25){
+  const sr = audioCtx.sampleRate;
+  const len = Math.floor(sr*dur);
+  const buf = audioCtx.createBuffer(1, len, sr);
+  const d = buf.getChannelData(0);
+  for (let i=0;i<len;i++){
+    const t = i/sr;
+    d[i] = Math.sin(2*Math.PI*freq*t) * Math.exp(-6*t) + (Math.random()*2-1)*0.002;
+  }
+  return buf;
+}
+
+/* add built-in library */
+function addBuiltInLibrary(){
+  const items = [
+    {name:'Click', buf:makeClickBuffer()},
+    {name:'Kick', buf:makeKickBuffer()},
+    {name:'Snare', buf:makeSnareBuffer()},
+    {name:'HiHat', buf:makeHatBuffer()},
+    {name:'Synth1', buf:makeShortSynth(900,0.25)},
+    {name:'Synth2', buf:makeShortSynth(600,0.28)},
+  ];
+  for (let it of items){
+    if (pads.length < MAX_PADS) createPad({name:it.name, buffer:it.buf});
+  }
+}
+
+/* create a pad object and UI */
+function createPad({name='Pad', buffer=null}){
+  if (pads.length >= MAX_PADS) return;
+  padCount++;
+  const id = 'pad'+padCount;
+  const pad = {
+    id, name, buffer,
+    settings: { gain:1, playbackRate:1, loop:false, reverse:false, key: PAD_KEYS[pads.length] || null, label:name }
+  };
+  pads.push(pad);
+  steps.push(new Array(STEPS).fill(false));
+  renderPad(pad);
+  renderSequencerRows();
+}
+
+/* clear pads */
+function clearPads(){
+  pads.splice(0,pads.length);
+  steps.splice(0,steps.length);
+  padCount = 0;
+  boardEl.innerHTML = '';
+  seqRowsEl.innerHTML = '';
+}
+
+/* render a pad card */
+function renderPad(pad){
+  const el = document.createElement('div');
+  el.className = 'pad';
+  el.id = pad.id;
+
+  const title = document.createElement('div');
+  title.className = 'title';
+  // editable label
+  const label = document.createElement('input');
+  label.value = pad.settings.label || pad.name;
+  label.style = 'background:transparent;border:none;color:inherit;font-weight:700;font-size:14px;width:70%';
+  label.addEventListener('input', ()=> pad.settings.label = label.value);
+  const keySpan = document.createElement('div');
+  keySpan.style.fontSize='12px'; keySpan.style.color='var(--muted)';
+  keySpan.textContent = pad.settings.key ? `[${pad.settings.key}]` : '';
+  title.appendChild(label);
+  title.appendChild(keySpan);
+  el.appendChild(title);
+
+  const hint = document.createElement('div');
+  hint.className = 'hint';
+  hint.innerText = 'Tap to play • Long samples auto-chop option';
+  el.appendChild(hint);
+
+  // waveform preview canvas
+  const wave = document.createElement('canvas');
+  wave.width = 300; wave.height = 48;
+  wave.style.width = '100%'; wave.style.height = '48px';
+  el.appendChild(wave);
+  if (pad.buffer) drawWaveform(wave, pad.buffer);
+
+  // controls
+  const controls = document.createElement('div');
+  controls.className = 'controls';
+
+  const playBtn = document.createElement('button');
+  playBtn.className = 'btn small';
+  playBtn.innerText = 'Play';
+  playBtn.onclick = e => { e.stopPropagation(); triggerPad(pad.id); };
+  controls.appendChild(playBtn);
+
+  // gain
+  const gainRange = document.createElement('input');
+  gainRange.type='range'; gainRange.min=0; gainRange.max=2; gainRange.step=0.01; gainRange.value=pad.settings.gain;
+  gainRange.title='Pad gain'; gainRange.style = 'width:70px';
+  gainRange.addEventListener('input', e => pad.settings.gain = parseFloat(e.target.value));
+  controls.appendChild(gainRange);
+
+  // rate
+  const rateRange = document.createElement('input');
+  rateRange.type='range'; rateRange.min=0.2; rateRange.max=2; rateRange.step=0.01; rateRange.value=pad.settings.playbackRate;
+  rateRange.title='Playback rate'; rateRange.style='width:70px';
+  rateRange.addEventListener('input', e => pad.settings.playbackRate = parseFloat(e.target.value));
+  controls.appendChild(rateRange);
+
+  // reverse toggle
+  const revBtn = document.createElement('button');
+  revBtn.className = 'btn small'; revBtn.textContent = 'Reverse';
+  revBtn.onclick = e => { e.stopPropagation(); pad.settings.reverse = !pad.settings.reverse; revBtn.style.opacity = pad.settings.reverse?1:0.6; };
+  controls.appendChild(revBtn);
+
+  // loop toggle
+  const loopBtn = document.createElement('button');
+  loopBtn.className = 'btn small'; loopBtn.textContent = 'Loop';
+  loopBtn.onclick = e => { e.stopPropagation(); pad.settings.loop = !pad.settings.loop; loopBtn.style.opacity = pad.settings.loop?1:0.6; };
+  controls.appendChild(loopBtn);
+
+  // remove
+  const remBtn = document.createElement('button');
+  remBtn.className='btn small'; remBtn.textContent='×';
+  remBtn.title='Remove pad';
+  remBtn.onclick = e => { e.stopPropagation(); removePad(pad.id); };
+  controls.appendChild(remBtn);
+
+  el.appendChild(controls);
+
+  // keyboard hint
+  if (pad.settings.key){
+    const kb = document.createElement('div');
+    kb.style.marginTop='6px';
+    kb.innerHTML = `<span class="kbd">${pad.settings.key}</span> Play`;
+    el.appendChild(kb);
+  }
+
+  // play on tap anywhere on pad
+  el.addEventListener('pointerdown', (ev)=>{
+    ev.preventDefault();
+    triggerPad(pad.id);
+  });
+
+  boardEl.appendChild(el);
+}
+
+/* remove pad by id */
+function removePad(padId){
+  const idx = pads.findIndex(p=>p.id===padId);
+  if (idx >= 0){
+    pads.splice(idx,1);
+    steps.splice(idx,1);
+    document.getElementById(padId)?.remove();
+    renderAllPadKeysAndUI();
+    renderSequencerRows();
+  }
+}
+
+/* redraw keys and titles when pads reordered/changed */
+function renderAllPadKeysAndUI(){
+  boardEl.innerHTML = '';
+  pads.forEach((p,i)=> {
+    p.settings.key = PAD_KEYS[i] || null;
+    renderPad(p);
+  });
+}
+
+/* draw waveform */
+function drawWaveform(canvas, buffer){
+  const w = canvas.width, h = canvas.height;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,w,h);
+  ctx.fillStyle = 'rgba(255,255,255,0.03)';
+  ctx.fillRect(0,0,w,h);
+  const data = buffer.getChannelData(0);
+  const step = Math.ceil(data.length / w);
+  ctx.fillStyle = '#7c5cff';
+  for (let i=0;i<w;i++){
+    const start = i*step;
+    let min = 1.0, max = -1.0;
+    for (let j=0;j<step;j++){
+      const v = data[start+j] || 0;
+      if (v < min) min = v;
+      if (v > max) max = v;
+    }
+    const y1 = ((1+min)/2) * h;
+    const y2 = ((1+max)/2) * h;
+    ctx.fillRect(i, y1, 1, Math.max(1, y2-y1));
+  }
+}
+
+/* trigger pad playback */
+function triggerPad(padId){
+  const pad = pads.find(p=>p.id===padId);
+  if (!pad) return;
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+
+  const el = document.getElementById(padId);
+  el.classList.add('playing');
+  setTimeout(()=> el.classList.remove('playing'), 120);
+
+  if (pad.buffer){
+    let bufferToPlay = pad.buffer;
+    if (pad.settings.reverse) bufferToPlay = reverseBuffer(pad.buffer);
+    playBuffer(pad, bufferToPlay);
+  } else {
+    // fallback click
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type='sine';
+    o.frequency.value = 800;
+    g.gain.value = 0;
+    const now = audioCtx.currentTime;
+    g.gain.linearRampToValueAtTime(0.6 * pad.settings.gain, now + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+    o.connect(g); g.connect(masterGain); g.connect(delayNode);
+    o.start(now); o.stop(now+0.2);
+  }
+}
+
+/* play buffer */
+function playBuffer(pad, buffer){
+  const source = audioCtx.createBufferSource();
+  source.buffer = buffer;
+  source.playbackRate.value = pad.settings.playbackRate || 1;
+  source.loop = !!pad.settings.loop;
+
+  const gainNode = audioCtx.createGain(); gainNode.gain.value = pad.settings.gain || 1;
+  source.connect(gainNode);
+
+  // routing
+  gainNode.connect(masterGain);
+  gainNode.connect(delayNode);
+  gainNode.connect(convolver);
+
+  source.start(audioCtx.currentTime);
+  source.onended = ()=> { source.disconnect(); gainNode.disconnect(); };
+}
+
+/* reverse buffer */
+function reverseBuffer(buf){
+  const c = buf.numberOfChannels;
+  const rev = audioCtx.createBuffer(c, buf.length, buf.sampleRate);
+  for (let ch=0; ch<c; ch++){
+    const src = buf.getChannelData(ch);
+    const dst = rev.getChannelData(ch);
+    for (let i=0;i<src.length;i++) dst[i] = src[src.length-1-i];
+  }
+  return rev;
+}
+
+/* --- Auto-chop upload handler --- */
+function handleFiles(e){
+  const files = Array.from(e.target.files).slice(0, 6); // allow up to 6 uploads so auto-chop creates <=12
+  const doAuto = autoChopCheckbox.checked;
+  files.forEach((f) => {
+    const reader = new FileReader();
+    reader.onload = ev => {
+      audioCtx.decodeAudioData(ev.target.result).then(buf => {
+        if (doAuto){
+          // chop into <= remainingSlots slices
+          const remaining = MAX_PADS - pads.length;
+          const slices = Math.min(remaining, Math.floor(buf.duration / 0.08) || remaining) || remaining;
+          // make sure at least 1 slice
+          const n = Math.max(1, Math.min(slices, 12));
+          const seg = Math.floor(buf.length / n);
+          for (let i=0;i<n;i++){
+            const newBuf = audioCtx.createBuffer(buf.numberOfChannels, seg, buf.sampleRate);
+            for (let ch=0; ch<buf.numberOfChannels; ch++){
+              const src = buf.getChannelData(ch);
+              const dst = newBuf.getChannelData(ch);
+              const start = i*seg;
+              for (let j=0;j<seg;j++) dst[j] = src[start + j] || 0;
+            }
+            createPad({name: `${f.name}_part${i+1}`, buffer:newBuf});
+          }
+        } else {
+          createPad({name:f.name.replace(/\..+$/,''), buffer:buf});
+        }
+      }).catch(err => {
+        console.warn('decode fail', err);
+      });
+    };
+    reader.readAsArrayBuffer(f);
+  });
+  fileInput.value = '';
+}
+
+/* --- Sequencer rendering & playback --- */
+function renderSequencerRows(){
+  seqRowsEl.innerHTML = '';
+  pads.forEach((pad, idx) => {
+    const row = document.createElement('div');
+    row.style.display='flex'; row.style.alignItems='center'; row.style.marginBottom='6px';
+    const label = document.createElement('div');
+    label.style.width='80px';
+    label.style.fontSize='13px';
+    label.style.color='#f3f7ff';
+    label.textContent = pad.settings.label || pad.name || `Pad ${idx+1}`;
+    row.appendChild(label);
+
+    const seqRow = document.createElement('div');
+    seqRow.className='seq-row';
+    seqRow.style.display='flex';
+    for (let s=0;s<STEPS;s++){
+      const stepEl = document.createElement('div');
+      stepEl.className = 'step' + (steps[idx][s] ? ' active' : '');
+      (function(i,stepElLocal){
+        stepElLocal.addEventListener('click',(ev)=>{
+          ev.stopPropagation();
+          steps[i][s] = !steps[i][s];
+          stepElLocal.classList.toggle('active', steps[i][s]);
+        });
+      })(idx, stepEl);
+      seqRow.appendChild(stepEl);
+    }
+    row.appendChild(seqRow);
+    seqRowsEl.appendChild(row);
+  });
+}
+
+/* sequence playback loop */
+let seqTimer = null;
+let seqPlaying = false;
+let seqPosition = 0;
+function playSequence(){
+  if (seqPlaying) return;
+  if (pads.length === 0) return;
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  seqPlaying = true;
+  seqPosition = 0;
+  const bpm = Math.max(40, Math.min(240, parseInt(bpmInput.value)||120));
+  const interval = (60 / bpm) / 4; // 16th notes for 16 steps => quarter note / 4
+  const scheduleAhead = 0.1;
+  let lastTime = audioCtx.currentTime;
+  seqTimer = setInterval(() => {
+    // compute current time
+    const now = audioCtx.currentTime;
+    // play all pads that have step at seqPosition
+    for (let p=0;p<pads.length;p++){
+      if (steps[p][seqPosition]){
+        const pad = pads[p];
+        if (pad.buffer){
+          let bufferToPlay = pad.buffer;
+          if (pad.settings.reverse) bufferToPlay = reverseBuffer(pad.buffer);
+          playBuffer(pad, bufferToPlay);
+        }
+      }
+    }
+    // advance
+    seqPosition = (seqPosition + 1) % STEPS;
+  }, interval * 1000);
+  playSeqBtn.classList.add('primary');
+}
+function stopSequence(){
+  if (!seqPlaying) return;
+  clearInterval(seqTimer); seqTimer = null; seqPlaying = false;
+  playSeqBtn.classList.remove('primary');
+}
+
+playSeqBtn.addEventListener('click', playSequence);
+stopSeqBtn.addEventListener('click', stopSequence);
+
+/* --- Keyboard mapping for pads (1..12) --- */
+document.addEventListener('keydown', (e)=>{
+  if (e.repeat) return;
+  const key = e.key;
+  // find pad by key assigned
+  const pad = pads.find(p => p.settings.key === key);
+  if (pad) { triggerPad(pad.id); return; }
+  // fallback: numeric mapping to pad by order (1->pad0, ..., 0->pad9, - -> pad10, = -> pad11)
+  const idx = PAD_KEYS.indexOf(key);
+  if (idx !== -1 && pads[idx]) triggerPad(pads[idx].id);
+});
+
+/* --- Reverb IR generator --- */
+function makeImpulseResponse(durationSec){
+  const rate = audioCtx.sampleRate;
+  const length = Math.floor(durationSec * rate);
+  const ir = audioCtx.createBuffer(2, length, rate);
+  for (let ch=0; ch<2; ch++){
+    const data = ir.getChannelData(ch);
+    for (let i=0;i<length;i++){
+      data[i] = (Math.random()*2-1) * Math.pow(1 - i/length, 2.0);
+    }
+  }
+  return ir;
+}
+function updateReverbIR(){
+  const val = parseFloat(reverbSize.value);
+  const secs = Math.max(0.001, val);
+  convolver.buffer = makeImpulseResponse(secs);
+}
+updateReverbIR();
+
+/* --- Visualizer --- */
+const vctx = visCanvas.getContext('2d');
+function drawVis(){
+  requestAnimationFrame(drawVis);
+  const w = visCanvas.width = visCanvas.clientWidth * devicePixelRatio;
+  const h = visCanvas.height = visCanvas.clientHeight * devicePixelRatio;
+  const data = new Uint8Array(analyser.fftSize);
+  analyser.getByteTimeDomainData(data);
+  vctx.clearRect(0,0,w,h);
+  vctx.fillStyle = 'rgba(10,14,22,0.35)';
+  vctx.fillRect(0,0,w,h);
+  vctx.lineWidth = 2 * devicePixelRatio;
+  vctx.strokeStyle = 'rgba(124,92,255,0.95)';
+  vctx.beginPath();
+  const step = Math.floor(data.length / w) || 1;
+  for (let i=0;i<w;i++){
+    const v = data[i*step]/128.0 - 1.0;
+    const y = (v * 0.4 + 0.5) * h;
+    if (i===0) vctx.moveTo(i, y); else vctx.lineTo(i,y);
+  }
+  vctx.stroke();
+}
+drawVis();
+
+/* --- Auto preload a few pads so user sees something immediately --- */
+addBuiltInLibrary();
+renderSequencerRows();
+
+/* --- Helper: redraw seq rows when pads added/removed --- */
+function renderSequencerRows(){
+  seqRowsEl.innerHTML = '';
+  pads.forEach((pad, idx) => {
+    const row = document.createElement('div');
+    row.style.display='flex'; row.style.alignItems='center'; row.style.marginBottom='6px';
+    const label = document.createElement('div');
+    label.style.width='80px'; label.style.fontSize='13px'; label.style.color='#f3f7ff';
+    label.textContent = pad.settings.label || pad.name || `Pad ${idx+1}`;
+    row.appendChild(label);
+    const seqRow = document.createElement('div');
+    seqRow.className='seq-row';
+    seqRow.style.display='flex';
+    for (let s=0;s<STEPS;s++){
+      const stepEl = document.createElement('div');
+      stepEl.className = 'step' + (steps[idx] && steps[idx][s] ? ' active' : '');
+      (function(i,syl,elLocal){
+        elLocal.addEventListener('click',(ev)=>{
+          ev.stopPropagation();
+          if (!steps[i]) steps[i] = new Array(STEPS).fill(false);
+          steps[i][syl] = !steps[i][syl];
+          elLocal.classList.toggle('active', steps[i][syl]);
+        });
+      })(idx, s, stepEl);
+      seqRow.appendChild(stepEl);
+    }
+    row.appendChild(seqRow);
+    seqRowsEl.appendChild(row);
+  });
+}
+
+/* --- utility: ensure audio context resumes on user gesture --- */
+window.addEventListener('pointerdown', async function resumeAudio(){
+  if (audioCtx.state === 'suspended') {
+    try{ await audioCtx.resume(); }catch(e){}
+  }
+  window.removeEventListener('pointerdown', resumeAudio);
+});
+
+/* --- Done --- */
+</script>
+</body>
+</html>
