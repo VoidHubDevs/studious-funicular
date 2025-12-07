@@ -1,0 +1,30 @@
+:root{
+  --bg:#041426; --card:#0b1430; --muted:#9fb0d9; --accent:#6f8cff; --accent2:#7ce3c9;
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;background:linear-gradient(180deg,#001025 0%,var(--bg) 100%);color:#eaf2ff;overflow:hidden}
+.bg-full{position:fixed;left:0;top:0;right:0;bottom:0;z-index:0;pointer-events:none}
+.app{position:relative;z-index:2;display:grid;grid-template-columns:320px 1fr 320px;gap:14px;height:100vh;padding:18px}
+.panel{background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent);border-radius:12px;padding:12px;border:1px solid rgba(255,255,255,0.03);overflow:auto;backdrop-filter: blur(6px)}
+.brand h1{margin:0;color:var(--accent);font-size:18px}
+.sub{font-size:12px;color:var(--muted)}
+.fileDrop{display:block;padding:10px;border-radius:8px;border:1px dashed rgba(255,255,255,0.04);text-align:center;color:var(--muted);cursor:pointer;margin:8px 0;background:linear-gradient(180deg,rgba(255,255,255,0.01),transparent)}
+.btn{background:rgba(255,255,255,0.03);border-radius:10px;padding:8px 10px;color:var(--muted);border:1px solid rgba(255,255,255,0.03);cursor:pointer}
+.btn.primary{background:linear-gradient(90deg,var(--accent),var(--accent2));color:#02243a;font-weight:700}
+.small{padding:6px 8px;font-size:13px}
+.row{display:flex;gap:8px;align-items:center}
+.sound-list{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.sound-item{display:flex;gap:8px;align-items:center;padding:8px;border-radius:10px;background:rgba(255,255,255,0.02)}
+.cover{width:56px;height:56px;border-radius:10px;background:#081020;flex:0 0 56px;display:flex;align-items:center;justify-content:center;color:var(--muted)}
+.canvasWrap{position:relative;height:60vh;border-radius:14px;overflow:hidden;border:3px solid rgba(255,255,255,0.04);box-shadow:0 12px 40px rgba(3,11,40,0.6)}
+canvas{position:absolute;left:0;top:0;width:100%;height:100%;display:block}
+.hint{color:var(--muted);font-size:13px}
+.small-title{font-weight:700;margin-top:10px}
+.statusRow{display:flex;justify-content:space-between;align-items:center;margin-top:10px}
+.linksjson{background:rgba(0,0,0,0.2);padding:8px;border-radius:8px;max-height:200px;overflow:auto}
+.footer-hint{font-size:12px;color:var(--muted);margin-top:10px}
+@media (max-width:1000px){
+  .app{grid-template-columns:1fr;grid-template-rows:260px 1fr 320px;padding:10px}
+  .canvasWrap{height:40vh}
+}
