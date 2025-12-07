@@ -1,653 +1,103 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Meme Sound Battle — Video Clip Import & Recorder</title>
-<style>
-:root{
-  --bg1:#021028; --card:#0c1630; --muted:#9fb0d9; --accent:#6f8cff; --accent2:#7ce3c9;
-  font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;
-}
-*{box-sizing:border-box}
-html,body{height:100%;margin:0;background:linear-gradient(180deg,var(--bg1),#041a33);color:#eaf2ff;overflow:hidden}
-.app{display:grid;grid-template-columns:340px 1fr 300px;gap:14px;height:100vh;padding:18px;position:relative;z-index:2}
-.panel{background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent);border:1px solid rgba(255,255,255,0.03);border-radius:12px;padding:12px;overflow:auto}
-h2{margin:0 0 8px 0;color:var(--accent)}
-.hint{color:var(--muted);font-size:13px;margin-bottom:8px}
-.row{display:flex;gap:8px;align-items:center}
-.btn{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.03);padding:8px 10px;border-radius:8px;color:var(--muted);cursor:pointer}
-.btn.primary{background:linear-gradient(90deg,var(--accent),var(--accent2));color:#04243a;font-weight:700}
-.small{padding:6px 8px;font-size:13px;border-radius:6px}
-.fileDrop{display:block;padding:10px;border-radius:8px;border:1px dashed rgba(255,255,255,0.04);text-align:center;color:var(--muted);cursor:pointer}
-.sound-list{display:flex;flex-direction:column;gap:8px;margin-top:8px}
-.sound-item{display:flex;gap:8px;align-items:center;padding:8px;border-radius:10px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.02)}
-.cover{width:56px;height:56px;border-radius:10px;background:#081020;flex:0 0 56px;display:flex;align-items:center;justify-content:center;color:var(--muted)}
-.sound-meta input[type="text"]{width:100%;border:none;background:transparent;color:inherit;font-weight:700;font-size:14px}
-.controls{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
-.arenaWrap{position:relative;display:flex;flex-direction:column;gap:10px;align-items:stretch;justify-content:center}
-.arena{flex:1;border-radius:18px;position:relative;overflow:hidden;border:2px solid rgba(255,255,255,0.03);background:transparent;display:flex;align-items:center;justify-content:center}
-.canvasStack{position:relative;width:92%;height:86%;border-radius:14px;overflow:hidden;box-shadow:0 12px 40px rgba(3,11,40,0.6)}
-#bgCanvas, #funnelCanvas, #uiCanvas{position:absolute;left:0;top:0;width:100%;height:100%;display:block}
-.controlsRow{display:flex;gap:8px;align-items:center;justify-content:space-between}
-.avatarLabel{font-size:12px;color:#fff;padding:6px 8px;border-radius:8px;background:rgba(0,0,0,0.55)}
-.leaderboardList{display:flex;flex-direction:column;gap:8px;margin-top:8px}
-.leaderRow{display:flex;gap:8px;align-items:center;padding:8px;border-radius:8px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.02)}
-.pos{width:28px;text-align:center;font-weight:800}
-.lbCover{width:46px;height:46px;border-radius:8px;overflow:hidden;flex:0 0 46px}
-.slider{width:100%}
-.inputTiny{font-size:13px;padding:6px 8px;border-radius:6px;background:transparent;border:1px solid rgba(255,255,255,0.04);color:inherit}
-@media (max-width:1000px){.app{grid-template-columns:1fr;grid-template-rows:260px 1fr 320px;padding:10px}}
-</style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Meme Sound Battle — Studio</title>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
-<canvas id="bgFull" style="position:fixed;left:0;top:0;right:0;bottom:0;z-index:0;pointer-events:none"></canvas>
+  <canvas id="bgFull" class="bg-full"></canvas>
 
-<div class="app" style="position:relative;z-index:2">
-  <!-- LEFT: Upload + Video -> Clip importer -->
-  <div class="panel" id="leftPanel">
-    <h2>Import from Video</h2>
-    <div class="hint">Upload your example video (MP4/WEBM). Preview, trim (30–45s), extract audio + cover frame, then add to the battle.</div>
+  <div class="app">
+    <aside class="panel left">
+      <div class="brand">
+        <h1>Meme Sound Battle</h1>
+        <div class="sub">Make short drops • record • download</div>
+      </div>
 
-    <label class="fileDrop" id="videoDrop">Click or drop video here
-      <input id="videoFile" type="file" accept="video/*" style="display:none">
-    </label>
+      <section>
+        <label class="fileDrop" id="audioDrop">Upload audio files (drag or click)</label>
+        <input id="audioFiles" type="file" accept="audio/*" multiple style="display:none" />
+        <label class="fileDrop" id="videoDrop">Upload video (optional)</label>
+        <input id="videoFile" type="file" accept="video/*" style="display:none" />
 
-    <div style="margin-top:8px">
-      <video id="previewVideo" controls style="width:100%;border-radius:8px;background:#000;display:none"></video>
-    </div>
+        <div class="row">
+          <button id="useSample" class="btn">Use example video</button>
+          <button id="addDemo" class="btn">Add demo sounds</button>
+        </div>
 
-    <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
-      <label style="flex:1">Start (sec) <input id="clipStart" type="number" value="0" min="0" step="0.1" class="inputTiny" style="width:110px;margin-left:8px"></label>
-      <label>Length (sec)
-        <select id="clipLength" class="inputTiny">
-          <option value="30">30</option>
-          <option value="35" selected>35</option>
-          <option value="40">40</option>
-          <option value="45">45</option>
-        </select>
-      </label>
-    </div>
+        <div id="items" class="sound-list"></div>
 
-    <div style="margin-top:8px;display:flex;gap:8px">
-      <button id="extractClip" class="btn primary">Create Clip & Add to Battle</button>
-      <button id="captureFrameBtn" class="btn small">Capture Frame Cover</button>
-    </div>
+        <hr/>
+        <div class="small-title">Intro & Voice</div>
+        <label><input id="autoIntro" type="checkbox" checked> Auto "A vs B vs C"</label>
+        <textarea id="introText" rows="2">Auto intro</textarea>
+        <div class="row">
+          <select id="voiceSelect"></select>
+          <button id="previewVoice" class="btn small">Preview</button>
+        </div>
+        <label><input id="robotVoice" type="checkbox"> Robotic voice (recordable)</label>
+      </section>
 
-    <div style="height:10px"></div>
-    <div class="hint">If your uploaded video contains an unwanted edit at the end, set the start/length so the clip excludes it (e.g. end earlier).</div>
+      <section>
+        <div class="small-title">Recording / Upload</div>
+        <div class="row">
+          <label>Format</label>
+          <select id="recordFormat">
+            <option value="video/webm">WebM</option>
+            <option value="video/mp4">MP4</option>
+          </select>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <button id="startRecord" class="btn primary">Start Recording</button>
+          <button id="stopRecord" class="btn">Stop</button>
+          <button id="downloadRecord" class="btn">Download Last</button>
+        </div>
 
-    <hr style="opacity:0.05;margin:12px 0">
+        <div style="margin-top:8px" class="hint">MediaFire upload: provide your token below to auto-upload (client-side placeholder).</div>
+        <input id="mediafireSession" placeholder="MediaFire session key (optional)" />
+        <div class="row" style="margin-top:8px">
+          <button id="uploadLast" class="btn">Upload Last</button>
+          <button id="exportJSON" class="btn">Export links.json</button>
+        </div>
+      </section>
 
-    <h2>Sound Items</h2>
-    <div class="hint">Uploaded clips and audio items appear here.</div>
-    <div id="soundContainer" class="sound-list"></div>
+      <div class="footer-hint">Place `footer.json` in root to include a footer burned into videos/captions (optional).</div>
+    </aside>
 
-    <div style="height:10px"></div>
-    <div class="controls">
-      <button id="addBuiltIn" class="btn small">Add demo memes</button>
-      <button id="clearAll" class="btn small">Clear</button>
-      <button id="startBtn" class="btn primary">Start Battle</button>
-    </div>
+    <main class="panel center">
+      <div class="arenaHeader">
+        <h2>Battle Arena</h2>
+        <div class="controls">
+          <button id="previewDrop" class="btn">Preview Drop</button>
+          <button id="startBattle" class="btn primary">Start Battle</button>
+          <button id="resetArena" class="btn">Reset</button>
+        </div>
+      </div>
 
-    <hr style="opacity:0.05;margin:12px 0">
-    <h3>Intro & Recording</h3>
-    <label><input id="autoIntro" type="checkbox" checked> Auto "A vs B vs C"</label>
-    <textarea id="introText" rows="2" style="width:100%;margin-top:6px;border-radius:8px;background:transparent;border:1px solid rgba(255,255,255,0.04);padding:8px"></textarea>
-
-    <div style="height:8px"></div>
-    <div class="row">
-      <label>Voice:</label>
-      <select id="voiceSelect" class="inputTiny" style="flex:1"></select>
-      <button id="previewVoice" class="btn small">Preview</button>
-    </div>
-    <div style="height:8px"></div>
-    <label><input id="useRobotic" type="checkbox"> Use robotic (recordable) voice</label>
-
-    <div style="height:8px"></div>
-    <div class="row">
-      <label>Record format</label>
-      <select id="recordFormat" class="inputTiny">
-        <option value="video/webm">WebM</option>
-        <option value="video/mp4">MP4 (if supported)</option>
-      </select>
-    </div>
-
-    <div style="height:8px"></div>
-    <div style="display:flex;gap:8px">
-      <button id="startRecord" class="btn small">Start Recording</button>
-      <button id="stopRecord" class="btn small">Stop</button>
-      <button id="downloadRecord" class="btn small">Download</button>
-    </div>
-  </div>
-
-  <!-- CENTER: arena (canvas-based) -->
-  <div class="panel arenaWrap">
-    <div class="arena">
-      <div class="canvasStack" id="canvasStack">
+      <div id="canvasWrap" class="canvasWrap">
         <canvas id="bgCanvas"></canvas>
         <canvas id="funnelCanvas"></canvas>
         <canvas id="uiCanvas"></canvas>
       </div>
-    </div>
 
-    <div class="controlsRow">
-      <div class="row">
-        <button id="previewDrop" class="btn small">Preview Drop</button>
-        <button id="resetArena" class="btn small">Reset</button>
-        <div class="avatarLabel" id="statusLabel">Ready</div>
+      <div class="statusRow">
+        <div id="status" class="hint">Ready</div>
+        <div id="timer" class="hint">Duration: 30–45s</div>
       </div>
-      <div class="row">
-        <label class="hint">Up to 8 items</label>
-      </div>
-    </div>
+    </main>
+
+    <aside class="panel right">
+      <h2>Leaderboard</h2>
+      <div id="leaderboard"></div>
+      <hr/>
+      <h3>Recording</h3>
+      <a id="lastDownload" href="#" download="">No recording yet</a>
+      <pre id="linksJSON" class="linksjson">[]</pre>
+    </aside>
   </div>
 
-  <!-- RIGHT: leaderboard -->
-  <div class="panel">
-    <h2>Leaderboard</h2>
-    <div class="hint">Icons that finish are recorded here in order.</div>
-    <div id="leaderboard" class="leaderboardList"></div>
-
-    <hr style="opacity:0.05;margin:12px 0">
-    <h3>Winner</h3>
-    <div id="winnerBox" style="min-height:140px;display:flex;align-items:center;justify-content:center;color:var(--muted)">No winner</div>
-
-    <div style="height:8px"></div>
-    <div style="display:flex;gap:8px;align-items:center">
-      <button id="announceWinner" class="btn small">Announce Winner</button>
-      <button id="copyBoard" class="btn small">Copy leaderboard</button>
-    </div>
-  </div>
-</div>
-
-<script>
-/* --- Utility & Canvas setup (keeps core parts compact) --- */
-const stack = document.getElementById('canvasStack');
-const funnelCanvas = document.getElementById('funnelCanvas');
-const bgCanvas = document.getElementById('bgCanvas');
-const uiCanvas = document.getElementById('uiCanvas');
-const bgFull = document.getElementById('bgFull');
-
-function fitCanvases(){
-  const rect = stack.getBoundingClientRect();
-  [bgCanvas, funnelCanvas, uiCanvas].forEach(c => {
-    c.width = rect.width * devicePixelRatio;
-    c.height = rect.height * devicePixelRatio;
-    c.style.width = rect.width + 'px';
-    c.style.height = rect.height + 'px';
-    const ctx = c.getContext('2d');
-    ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
-  });
-}
-window.addEventListener('resize', ()=> { fitCanvases(); resizeBgFull(); drawFunnelBase(); drawUI(); });
-fitCanvases();
-
-function resizeBgFull(){
-  bgFull.width = innerWidth * devicePixelRatio; bgFull.height = innerHeight * devicePixelRatio;
-  bgFull.style.width = innerWidth + 'px'; bgFull.style.height = innerHeight + 'px';
-  const ctx = bgFull.getContext('2d'); ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
-}
-resizeBgFull();
-
-/* Minimal animated full-screen background */
-const ctxFull = bgFull.getContext('2d');
-let particles = [];
-function initParticles(){ particles = []; for (let i=0;i<30;i++) particles.push({x:Math.random()*innerWidth,y:Math.random()*innerHeight,r:30+Math.random()*140,vx:(Math.random()-0.5)*0.3,vy:(Math.random()-0.5)*0.3,hue:200+Math.random()*80,alpha:0.05+Math.random()*0.08})}
-initParticles();
-function drawBG(){ ctxFull.clearRect(0,0,innerWidth,innerHeight); const g = ctxFull.createLinearGradient(0,0,innerWidth,innerHeight); g.addColorStop(0,'#001020'); g.addColorStop(1,'#05233b'); ctxFull.fillStyle=g; ctxFull.fillRect(0,0,innerWidth,innerHeight);
-  particles.forEach(p=>{ p.x+=p.vx; p.y+=p.vy; if(p.x<-p.r) p.x=innerWidth+p.r; if(p.x>innerWidth+p.r) p.x=-p.r; if(p.y<-p.r) p.y=innerHeight+p.r; if(p.y>innerHeight+p.r) p.y=-p.r; const rg=ctxFull.createRadialGradient(p.x,p.y,p.r*0.1,p.x,p.y,p.r); rg.addColorStop(0,`hsla(${p.hue},80%,70%,${p.alpha})`); rg.addColorStop(1,`hsla(${p.hue},60%,30%,0)`); ctxFull.fillStyle=rg; ctxFull.beginPath(); ctxFull.arc(p.x,p.y,p.r,0,Math.PI*2); ctxFull.fill(); }); requestAnimationFrame(drawBG); } drawBG();
-
-/* Funnel base draw */
-const fctx = funnelCanvas.getContext('2d');
-const uctx = uiCanvas.getContext('2d');
-
-function drawFunnelBase(){
-  const rect = stack.getBoundingClientRect(); const w=rect.width,h=rect.height;
-  fctx.clearRect(0,0,w,h);
-  const grad = fctx.createLinearGradient(0,0,0,h); grad.addColorStop(0,'#7bb8ff'); grad.addColorStop(1,'#3ea0ff');
-  fctx.fillStyle = grad;
-  const p1={x:w*0.2,y:0}, p2={x:w*0.8,y:0}, p3={x:w*0.95,y:h*0.78}, p4={x:w*0.5,y:h}, p5={x:w*0.05,y:h*0.78};
-  fctx.beginPath(); fctx.moveTo(p1.x,p1.y); fctx.lineTo(p2.x,p2.y); fctx.lineTo(p3.x,p3.y); fctx.lineTo(p4.x,p4.y); fctx.lineTo(p5.x,p5.y); fctx.closePath(); fctx.fill();
-}
-drawFunnelBase();
-
-/* ---------- Items and UI ---------- */
-const MAX_ITEMS = 8;
-let items = []; // {id,name,audioUrl,coverUrl,audioEl,buffer}
-let landingOrder = [];
-
-const soundContainer = document.getElementById('soundContainer');
-function renderItems(){
-  soundContainer.innerHTML='';
-  items.forEach((it,idx)=>{
-    const el=document.createElement('div'); el.className='sound-item';
-    const cov=document.createElement('div'); cov.className='cover';
-    if(it.coverUrl){ const im=document.createElement('img'); im.src=it.coverUrl; im.style.width='100%'; im.style.height='100%'; im.style.objectFit='cover'; cov.appendChild(im); } else cov.textContent=(idx+1);
-    el.appendChild(cov);
-    const meta=document.createElement('div'); meta.style.flex='1';
-    const nameIn=document.createElement('input'); nameIn.type='text'; nameIn.value=it.name; nameIn.addEventListener('input',()=>{it.name=nameIn.value; updateIntro();});
-    meta.appendChild(nameIn);
-    const controls=document.createElement('div'); controls.style.marginTop='6px';
-    const play=document.createElement('button'); play.className='btn small'; play.textContent='Play'; play.onclick=(e)=>{ e.stopPropagation(); try{ it.audioEl.currentTime=0; it.audioEl.play(); }catch(e){} };
-    const rem=document.createElement('button'); rem.className='btn small'; rem.textContent='Remove'; rem.onclick=(e)=>{ e.stopPropagation(); items.splice(idx,1); renderItems(); };
-    controls.appendChild(play); controls.appendChild(rem);
-    meta.appendChild(controls);
-    el.appendChild(meta);
-    soundContainer.appendChild(el);
-  });
-  updateIntro();
-}
-
-/* ---------- Video upload & clip extraction logic ---------- */
-const videoFileInput = document.getElementById('videoFile');
-const videoDrop = document.getElementById('videoDrop');
-const previewVideo = document.getElementById('previewVideo');
-const clipStartInput = document.getElementById('clipStart');
-const clipLengthSelect = document.getElementById('clipLength');
-const extractClipBtn = document.getElementById('extractClip');
-const captureFrameBtn = document.getElementById('captureFrameBtn');
-let uploadedVideoFile = null;
-let lastCapturedCover = null;
-
-videoDrop.addEventListener('click', ()=> videoFileInput.click());
-videoDrop.addEventListener('dragover', e=>{ e.preventDefault(); videoDrop.style.borderColor='#7bb8ff'; });
-videoDrop.addEventListener('dragleave', ()=> videoDrop.style.borderColor='');
-videoDrop.addEventListener('drop', e=>{ e.preventDefault(); videoDrop.style.borderColor=''; const f = e.dataTransfer.files[0]; if(f) handleVideoFile(f); });
-
-videoFileInput.addEventListener('change', e=> { const f = e.target.files[0]; if (f) handleVideoFile(f); });
-
-function handleVideoFile(file){
-  uploadedVideoFile = file;
-  const url = URL.createObjectURL(file);
-  previewVideo.src = url; previewVideo.style.display='block';
-  previewVideo.onloadedmetadata = ()=> {
-    clipStartInput.max = Math.max(0, previewVideo.duration - 1);
-    // default start 0, default length 35 but ensure fits
-    const defLen = 35; const maxLen = Math.min(45, Math.floor(previewVideo.duration));
-    if (parseInt(clipLengthSelect.value) > maxLen) clipLengthSelect.value = String(maxLen);
-  };
-}
-
-/* capture a frame at current preview time (or start) */
-captureFrameBtn.addEventListener('click', ()=>{
-  if (!previewVideo.src) return alert('Upload a video first');
-  const t = Math.max(0, Number(clipStartInput.value) || 0);
-  captureFrameFromVideo(previewVideo, t).then(url => {
-    lastCapturedCover = url;
-    alert('Frame captured as cover (will be used when creating clip)');
-  }).catch(err => alert('Failed to capture frame: ' + err));
-});
-
-function captureFrameFromVideo(videoEl, timeSec){
-  return new Promise((resolve,reject)=>{
-    const tempVid = document.createElement('video');
-    tempVid.crossOrigin = "anonymous";
-    tempVid.src = videoEl.src;
-    tempVid.muted = true;
-    tempVid.currentTime = Math.max(0,timeSec);
-    tempVid.playsInline = true;
-    tempVid.onseeked = ()=> {
-      const canvas = document.createElement('canvas');
-      canvas.width = tempVid.videoWidth; canvas.height = tempVid.videoHeight;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(tempVid,0,0,canvas.width,canvas.height);
-      canvas.toBlob(b => {
-        const url = URL.createObjectURL(b);
-        resolve(url);
-      }, 'image/jpeg', 0.9);
-    };
-    tempVid.onerror = (e)=> reject(e);
-  });
-}
-
-/* Extract audio slice from uploaded video file using decodeAudioData -> slice -> WAV blob */
-async function extractAudioClipFromFile(file, startSec, lengthSec){
-  // read file as arrayBuffer
-  const ab = await file.arrayBuffer();
-  // create AudioContext offline decode
-  const ac = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, 1, 44100);
-  // we need a real AudioContext to decode - use temp
-  const decodeCtx = new (window.AudioContext || window.webkitAudioContext)();
-  try {
-    const audioBuffer = await decodeCtx.decodeAudioData(ab.slice(0)); // may throw if container unsupported
-    // compute slice frames
-    const sr = audioBuffer.sampleRate;
-    const startFrame = Math.floor(startSec * sr);
-    const endFrame = Math.min(audioBuffer.length, startFrame + Math.floor(lengthSec * sr));
-    const frameCount = endFrame - startFrame;
-    const newBuf = decodeCtx.createBuffer(audioBuffer.numberOfChannels, frameCount, sr);
-    for (let ch=0; ch < audioBuffer.numberOfChannels; ch++){
-      const src = audioBuffer.getChannelData(ch);
-      const dst = newBuf.getChannelData(ch);
-      for (let i=0;i<frameCount;i++) dst[i] = src[startFrame + i] || 0;
-    }
-    // encode to WAV
-    const wav = audioBufferToWav(newBuf);
-    const blob = new Blob([wav], {type:'audio/wav'});
-    decodeCtx.close && decodeCtx.close();
-    return blob;
-  } catch (err){
-    decodeCtx.close && decodeCtx.close();
-    throw new Error('Browser cannot decode this video file for audio extraction: ' + err.message);
-  }
-}
-
-/* WAV encoder (interleaving) - small helper */
-function audioBufferToWav(buffer, opt) {
-  opt = opt || {};
-  var numChannels = buffer.numberOfChannels;
-  var sampleRate = buffer.sampleRate;
-  var format = opt.float32 ? 3 : 1;
-  var bitDepth = format === 3 ? 32 : 16;
-  var result;
-  if (numChannels === 2) {
-    result = interleave(buffer.getChannelData(0), buffer.getChannelData(1));
-  } else {
-    result = buffer.getChannelData(0);
-  }
-  return encodeWAV(result, numChannels, sampleRate, bitDepth, format);
-}
-function interleave(inputL, inputR){
-  var length = inputL.length + inputR.length;
-  var result = new Float32Array(length);
-  var index = 0, inputIndex = 0;
-  while (index < length){
-    result[index++] = inputL[inputIndex];
-    result[index++] = inputR[inputIndex];
-    inputIndex++;
-  }
-  return result;
-}
-function encodeWAV(samples, numChannels, sampleRate, bitDepth, format){
-  var bytesPerSample = bitDepth / 8;
-  var blockAlign = numChannels * bytesPerSample;
-  var buffer = new ArrayBuffer(44 + samples.length * bytesPerSample);
-  var view = new DataView(buffer);
-  /* RIFF identifier */
-  writeString(view, 0, 'RIFF');
-  /* file length */
-  view.setUint32(4, 36 + samples.length * bytesPerSample, true);
-  /* RIFF type */
-  writeString(view, 8, 'WAVE');
-  /* format chunk identifier */
-  writeString(view, 12, 'fmt ');
-  /* format chunk length */
-  view.setUint32(16, 16, true);
-  /* sample format (raw) */
-  view.setUint16(20, format === 3 ? 3 : 1, true);
-  /* channel count */
-  view.setUint16(22, numChannels, true);
-  /* sample rate */
-  view.setUint32(24, sampleRate, true);
-  /* byte rate (sample rate * block align) */
-  view.setUint32(28, sampleRate * blockAlign, true);
-  /* block align (channel count * bytes per sample) */
-  view.setUint16(32, blockAlign, true);
-  /* bits per sample */
-  view.setUint16(34, bitDepth, true);
-  /* data chunk identifier */
-  writeString(view, 36, 'data');
-  /* data chunk length */
-  view.setUint32(40, samples.length * bytesPerSample, true);
-  // write samples
-  if (format === 1) { // 16-bit PCM
-    floatTo16BitPCM(view, 44, samples);
-  } else {
-    writeFloat32(view, 44, samples);
-  }
-  return view;
-}
-function floatTo16BitPCM(output, offset, input){
-  for (var i=0;i<input.length;i++, offset+=2){
-    var s = Math.max(-1, Math.min(1, input[i]));
-    output.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
-  }
-}
-function writeFloat32(output, offset, input){
-  for (var i=0;i<input.length;i++, offset+=4){
-    output.setFloat32(offset, input[i], true);
-  }
-}
-function writeString(view, offset, string){
-  for (var i=0;i<string.length;i++){
-    view.setUint8(offset + i, string.charCodeAt(i));
-  }
-}
-
-/* Button: extract clip and add as item */
-extractClipBtn.addEventListener('click', async ()=>{
-  if (!uploadedVideoFile) return alert('Upload a video first.');
-  const start = Math.max(0, Number(clipStartInput.value) || 0);
-  const length = Math.max(30, Math.min(45, Number(clipLengthSelect.value) || 35));
-  // ensure within video duration
-  if (previewVideo.duration && start + length > previewVideo.duration){
-    alert('Selected clip exceeds video duration. Set a shorter length or lower start.');
-    return;
-  }
-  statusLabel.textContent = 'Extracting audio clip...';
-  try {
-    const wavBlob = await extractAudioClipFromFile(uploadedVideoFile, start, length);
-    // create audio element url
-    const aUrl = URL.createObjectURL(wavBlob);
-    // use captured cover or take a frame at start
-    let coverUrl = lastCapturedCover;
-    if (!coverUrl){
-      coverUrl = await captureFrameFromVideo(previewVideo, start);
-    }
-    // add as item
-    addExtractedItem(`Clip ${items.length+1}`, aUrl, coverUrl);
-    statusLabel.textContent = 'Clip added';
-  } catch (err){
-    statusLabel.textContent = 'Extraction failed';
-    alert('Failed to extract audio clip: ' + err.message + '\nIf this happens, try using Chrome/Edge/Firefox and ensure the video codec is supported. You can still use the site by extracting audio with an external tool or uploading audio file directly.');
-  }
-});
-
-/* Add extracted item helper */
-function addExtractedItem(name, audioUrl, coverUrl){
-  if (items.length >= MAX_ITEMS) return alert('Max items reached');
-  const audioEl = new Audio(audioUrl); audioEl.preload='auto';
-  const id = 'it'+Date.now();
-  items.push({id, name, audioUrl, coverUrl, audioEl});
-  renderItems();
-}
-
-/* ---------- rest: battle animation + recording (same approach as before) ---------- */
-const startBtn = document.getElementById('startBtn');
-const previewDrop = document.getElementById('previewDrop');
-const resetArenaBtn = document.getElementById('resetArena');
-const startRecordBtn = document.getElementById('startRecord');
-const stopRecordBtn = document.getElementById('stopRecord');
-const downloadRecordBtn = document.getElementById('downloadRecord');
-const recordFormat = document.getElementById('recordFormat');
-const voiceSelect = document.getElementById('voiceSelect');
-const previewVoiceBtn = document.getElementById('previewVoice');
-const useRoboticCheckbox = document.getElementById('useRobotic');
-const announceWinnerBtn = document.getElementById('announceWinner');
-const copyBoardBtn = document.getElementById('copyBoard');
-
-let animRunning=false;
-let avatars=[];
-let landingOrder=[];
-let audioCtx=null, masterDestination=null, masterGain=null;
-let recorder=null, recordedBlobs=null;
-
-/* simple avatar spawn & animation (kept compact) */
-function resetArena(){
-  avatars=[]; landingOrder=[]; renderLeaderboard(); winnerBox.textContent='No winner'; drawFunnelBase(); drawUI();
-  animRunning=false;
-}
-function previewSpawn(){ resetArena(); spawnAvatarsPreview(); }
-function spawnAvatarsPreview(){
-  const rect = stack.getBoundingClientRect(); const w=rect.width,h=rect.height;
-  items.forEach((it,idx)=>{
-    avatars.push({item:it,x:(w*0.2)+Math.random()*(w*0.6),y:-90,vy:0,landed:false,id:it.id,imgUrl:it.coverUrl});
-  });
-  if (!animRunning){ animRunning=true; requestAnimationFrame(animate); }
-}
-function startBattle(){ resetArena(); spawnAvatarsPreview(); statusLabel.textContent='Battle'; }
-previewDrop.addEventListener('click', ()=> { if (!items.length) return alert('Add items first'); previewSpawn(); if (useRoboticCheckbox.checked) roboticSpeak(introTextArea.value||items.map(i=>i.name).join(' vs ')); else { const u=new SpeechSynthesisUtterance(introTextArea.value||items.map(i=>i.name).join(' vs ')); speechSynthesis.speak(u); }});
-startBtn.addEventListener('click', ()=> { if (!items.length) return alert('Add items'); if (autoIntro.checked) introTextArea.value = items.map(i=>i.name).join(' vs '); if (useRoboticCheckbox.checked) { roboticSpeak(introTextArea.value||'Ready'); setTimeout(()=> startBattle(), 800); } else { const u = new SpeechSynthesisUtterance(introTextArea.value||'Ready'); u.onend = ()=> startBattle(); speechSynthesis.speak(u); } });
-
-function animate(){
-  const rect = stack.getBoundingClientRect(); const w=rect.width,h=rect.height;
-  drawFunnelBase();
-  const bottom = h - 100;
-  avatars.forEach((av,idx)=>{
-    av.vy += 0.35 + Math.random()*0.06;
-    av.y += av.vy;
-    av.x += Math.sin((Date.now()/600)+idx)*0.6;
-    if (!av.landed && av.y >= bottom){
-      av.vy = -av.vy * (0.45 + Math.random()*0.15); av.y = bottom; av.bounceCount = (av.bounceCount||0)+1;
-      if (av.bounceCount > 1){ av.landed=true; onAvatarLand(av); }
-    }
-    // draw avatar
-    const ctx = fctx;
-    const rad = 38;
-    ctx.save();
-    ctx.beginPath(); ctx.arc(av.x+rad,av.y+rad,rad,0,Math.PI*2); ctx.closePath(); ctx.fillStyle='rgba(0,0,0,0.15)'; ctx.fill();
-    if (av.imgUrl){
-      const im = new Image(); im.src = av.imgUrl; try{ ctx.save(); ctx.beginPath(); ctx.arc(av.x+rad,av.y+rad,rad,0,Math.PI*2); ctx.clip(); ctx.drawImage(im,av.x,av.y,rad*2,rad*2); ctx.restore(); }catch(e){}
-    } else { ctx.fillStyle='#12202f'; ctx.fillRect(av.x,av.y,rad*2,rad*2); ctx.fillStyle='#fff'; ctx.font='bold 14px sans-serif'; ctx.fillText(av.item.name.slice(0,2).toUpperCase(), av.x+rad-10, av.y+rad+6); }
-    // bubble
-    ctx.fillStyle='rgba(0,0,0,0.6)'; const label=av.item.name; ctx.font='12px sans-serif'; const lw=ctx.measureText(label).width+16; const lx=av.x+rad - lw/2 + rad; ctx.fillRect(lx, av.y + rad*2 + 6, lw, 22); ctx.fillStyle='#fff'; ctx.fillText(label, lx+8, av.y + rad*2 + 20);
-    ctx.restore();
-  });
-  drawUI();
-  if (animRunning) requestAnimationFrame(animate);
-}
-
-/* on landing */
-function onAvatarLand(av){
-  try {
-    if (!audioCtx) initAudioContext();
-    if (!av.item.sourceNode){
-      const src = audioCtx.createMediaElementSource(av.item.audioEl);
-      src.connect(masterGain);
-      av.item.sourceNode = src;
-    }
-    av.item.audioEl.currentTime = 0; av.item.audioEl.play().catch(()=>{});
-  } catch(e){}
-  if (!landingOrder.find(l=>l.id===av.id)) { landingOrder.push({id:av.id,name:av.item.name,cover:av.item.coverUrl}); renderLeaderboard(); if (landingOrder.length===1) showWinner(landingOrder[0]); }
-}
-
-/* render leaderboard */
-function renderLeaderboard(){
-  const el = document.getElementById('leaderboard'); el.innerHTML='';
-  landingOrder.forEach((l,i)=>{ const row=document.createElement('div'); row.className='leaderRow'; const pos=document.createElement('div'); pos.className='pos'; pos.textContent=(i+1); const cov=document.createElement('div'); cov.className='lbCover'; if (l.cover){ const img=document.createElement('img'); img.src=l.cover; img.style.width='100%'; img.style.height='100%'; img.style.objectFit='cover'; cov.appendChild(img);} else cov.textContent=l.name.slice(0,2).toUpperCase(); const nm=document.createElement('div'); nm.textContent=l.name; nm.style.fontWeight='700'; row.appendChild(pos); row.appendChild(cov); row.appendChild(nm); el.appendChild(row); });
-}
-function showWinner(w){ const box=document.getElementById('winnerBox'); box.innerHTML=''; const c=document.createElement('div'); c.style.display='flex'; c.style.flexDirection='column'; c.style.alignItems='center'; const cov=document.createElement('div'); cov.style.width='120px'; cov.style.height='120px'; cov.style.borderRadius='12px'; cov.style.overflow='hidden'; if (w.cover){ const im=document.createElement('img'); im.src=w.cover; im.style.width='100%'; im.style.height='100%'; im.style.objectFit='cover'; cov.appendChild(im); } else { cov.style.display='flex'; cov.style.alignItems='center'; cov.style.justifyContent='center'; cov.style.background='linear-gradient(90deg,#6f8cff,#7ce3c9)'; cov.textContent=w.name.slice(0,2).toUpperCase(); } const nm=document.createElement('div'); nm.textContent=w.name; nm.style.marginTop='8px'; nm.style.fontWeight='800'; c.appendChild(cov); c.appendChild(nm); box.appendChild(c); }
-
-/* TTS and robotic */
-function populateVoices(){ const voices = speechSynthesis.getVoices(); const sel=voiceSelect; sel.innerHTML=''; voices.forEach(v=>{ const opt=document.createElement('option'); opt.value=v.name; opt.textContent=`${v.name} (${v.lang})${v.default?' • default':''}`; sel.appendChild(opt); }); }
-speechSynthesis.onvoiceschanged = populateVoices; populateVoices();
-previewVoiceBtn.addEventListener('click', ()=> { const text = introText.value || (items.map(i=>i.name).join(' vs ')); const u = new SpeechSynthesisUtterance(text); const v= speechSynthesis.getVoices().find(x=>x.name===voiceSelect.value); if (v) u.voice=v; speechSynthesis.cancel(); speechSynthesis.speak(u); });
-
-function initAudioContext(){
-  if (audioCtx) return;
-  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  masterDestination = audioCtx.createMediaStreamDestination();
-  masterGain = audioCtx.createGain(); masterGain.gain.value=1;
-  masterGain.connect(masterDestination);
-}
-
-/* Simple robotic speak via WebAudio (recordable) */
-function roboticSpeak(text, offset=0){
-  if (!audioCtx) initAudioContext();
-  const words = text.split(/\s+/).slice(0,16);
-  let t = audioCtx.currentTime + offset;
-  words.forEach((w,idx)=>{
-    const freq = 220 + idx*40;
-    const o = audioCtx.createOscillator(); o.type='sawtooth'; o.frequency.value=freq + (Math.random()*40 - 20);
-    const g = audioCtx.createGain(); g.gain.value=0;
-    o.connect(g); g.connect(masterGain);
-    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.8, t+0.01); g.gain.exponentialRampToValueAtTime(0.001, t+0.12);
-    o.start(t); o.stop(t+0.14); t += 0.18;
-  });
-}
-
-/* Recording: composite canvas + master audio stream */
-let compositeCanvasLoopActive=false;
-startRecordBtn.addEventListener('click', async ()=>{
-  if (!items.length) return alert('Add items first');
-  initAudioContext();
-  // ensure each audio element is connected
-  items.forEach(it=>{ if (!it.sourceNode){ try{ it.sourceNode = audioCtx.createMediaElementSource(it.audioEl); it.sourceNode.connect(masterGain); }catch(e){} }});
-  // composite canvas capture
-  const rect = stack.getBoundingClientRect(); const width = rect.width, height = rect.height;
-  const comp = document.createElement('canvas'); comp.width = width * devicePixelRatio; comp.height = height * devicePixelRatio; comp.style.width = width + 'px'; comp.style.height = height + 'px';
-  const compCtx = comp.getContext('2d'); compCtx.scale(devicePixelRatio, devicePixelRatio);
-  compositeCanvasLoopActive = true;
-  function compLoop(){
-    if (!compositeCanvasLoopActive) return;
-    compCtx.clearRect(0,0,width,height);
-    compCtx.drawImage(bgCanvas,0,0,width,height);
-    compCtx.drawImage(funnelCanvas,0,0,width,height);
-    compCtx.drawImage(uiCanvas,0,0,width,height);
-    requestAnimationFrame(compLoop);
-  }
-  compLoop();
-  const canvasStream = comp.captureStream(30);
-  const mixedStream = new MediaStream();
-  canvasStream.getVideoTracks().forEach(t=>mixedStream.addTrack(t));
-  masterDestination.stream.getAudioTracks().forEach(t=>mixedStream.addTrack(t));
-  const options = { mimeType: recordFormat.value };
-  try { recorder = new MediaRecorder(mixedStream, options); }
-  catch(e){ try{ recorder = new MediaRecorder(mixedStream); } catch(e){ return alert('Recording failed: ' + e.message); } }
-  recordedBlobs = [];
-  recorder.ondataavailable = e=> { if (e.data && e.data.size) recordedBlobs.push(e.data); };
-  recorder.onstop = ()=> { compositeCanvasLoopActive=false; const blob = new Blob(recordedBlobs, {type: options.mimeType || 'video/webm'}); recordedBlob = blob; statusLabel.textContent='Recording ready'; };
-  recorder.start();
-  statusLabel.textContent='Recording...';
-});
-
-stopRecordBtn.addEventListener('click', ()=> {
-  if (recorder && recorder.state === 'recording') recorder.stop();
-  else alert('No active recording');
-});
-
-let recordedBlob = null;
-downloadRecordBtn.addEventListener('click', ()=> {
-  if (!recordedBlob) return alert('No recording to download');
-  const url = URL.createObjectURL(recordedBlob);
-  const a = document.createElement('a'); a.href = url; const ext = recordFormat.value.includes('mp4') ? 'mp4' : 'webm'; a.download = `meme-battle.${ext}`; a.click(); URL.revokeObjectURL(url);
-});
-
-/* utilities */
-const introText = document.getElementById('introText');
-const autoIntro = document.getElementById('autoIntro');
-function updateIntro(){ if (autoIntro.checked){ introText.value = items.length ? items.map(i=>i.name).join(' vs ') : ''; } drawUI(); }
-document.getElementById('clearAll').addEventListener('click', ()=> { if(!confirm('Clear all items?')) return; items=[]; renderItems(); resetArena(); });
-
-document.getElementById('previewRobot').addEventListener('click', ()=> { roboticSpeak(introText.value || items.map(i=>i.name).join(' vs ')); });
-
-announceWinnerBtn.addEventListener('click', ()=> { if (!landingOrder.length) return alert('No winner'); if (useRoboticCheckbox.checked) roboticSpeak(`${landingOrder[0].name} is the winner`); else { const u=new SpeechSynthesisUtterance(`${landingOrder[0].name} is the winner`); speechSynthesis.speak(u); } });
-copyBoardBtn.addEventListener('click', ()=> { if (!landingOrder.length) return alert('No entries'); const txt = landingOrder.map((l,i)=>`${i+1}. ${l.name}`).join('\\n'); navigator.clipboard?.writeText(txt).then(()=>alert('Copied'), ()=>alert('Copy failed')); });
-
-/* initial draw/resize */
-fitCanvases();
-drawFunnelBase();
-drawUI();
-function drawUI(){ const rect = stack.getBoundingClientRect(); const w=rect.width,h=rect.height; uctx.clearRect(0,0,w,h); uctx.fillStyle='#fff'; uctx.font='bold 22px sans-serif'; uctx.textAlign='center'; uctx.fillText(introText.value || (items.map(i=>i.name).join(' vs ')), w/2, 36); uctx.font='13px sans-serif'; uctx.textAlign='left'; uctx.fillStyle='rgba(255,255,255,0.85)'; uctx.fillText(`Items: ${items.length}  Landed: ${landingOrder.length}`, 12, h-12); }
-
-/* helper captureFrameFromVideo (reused) */
-function captureFrameFromVideo(videoEl, timeSec){
-  return new Promise((resolve,reject)=>{
-    const tmp = document.createElement('video');
-    tmp.src = videoEl.src;
-    tmp.crossOrigin='anonymous';
-    tmp.muted=true; tmp.currentTime = Math.max(0,timeSec);
-    tmp.onseeked = ()=> {
-      const canvas = document.createElement('canvas');
-      canvas.width = tmp.videoWidth; canvas.height = tmp.videoHeight;
-      const ctx = canvas.getContext('2d'); ctx.drawImage(tmp,0,0,canvas.width,canvas.height);
-      canvas.toBlob(b => { resolve(URL.createObjectURL(b)); }, 'image/jpeg', 0.9);
-    };
-    tmp.onerror = (e)=> reject(e);
-  });
-}
-
-</script>
+<script src="app.js"></script>
 </body>
-  </html>
+          </html>
